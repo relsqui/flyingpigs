@@ -9,8 +9,8 @@ check_on() {
         if [ -n "$proc" ]; then
             echo $proc | while read pid user tty cpu mem nice command; do
                 # truncate numbers so bash can compare them
-                cpu=`echo $cpu | cut -d '.' -f 1`
-                mem=`echo $mem | cut -d '.' -f 1`
+                intcpu=`echo $cpu | cut -d '.' -f 1`
+                intmem=`echo $mem | cut -d '.' -f 1`
 
                 # every field should have at least a placeholder
                 if [ -z $tty ]; then tty="-"; fi
@@ -19,7 +19,7 @@ check_on() {
                 if [ -z $nice ]; then nice="-"; fi
 
                 # check memory and cpu usage and record if necessary
-                if [ $cpu -ge 10 -o $mem -ge 10 ]; then
+                if [ $intcpu -ge 10 -o $intmem -ge 10 ]; then
 					# these are tab characters, so we can split on them later
                     echo "$short_name	$pid	$user	$tty	$cpu	$mem	$nice	$command" >> $tempdir/processes
                 fi 2>/dev/null
@@ -40,6 +40,7 @@ check_on() {
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/servers
+echo "SERVER	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
 # collect and count the servers
 servers=`netgrouplist linux-login-sys ece-secure-sys cs-secure-sys`
@@ -61,7 +62,22 @@ while [ ! -e $tempdir/ready ]; do sleep .1; done
 echo " done." >&2
 
 # display the results, nicely formatted
-column -ts "	" $tempdir/processes | cut -c 1-`tput cols`
+candidates=`cat $tempdir/processes | wc -l`
+if [ $candidates -eq 0 ]; then
+    echo "Found no potential runaways."
+else
+    echo "Found $candidates potential runaways."
+    echo
+    cat $tempdir/header $tempdir/processes | column -ts "	" |\
+        cut -c 1-`tput cols` > $tempdir/formatted
+    # output headers on stderr, content on stdout
+    head -n 1 $tempdir/formatted >&2
+    tail -n +2 $tempdir/formatted
+fi
 
 # clean up
 rm -r $tempdir
+
+
+# modeline to tell vim not to expand the tabs in this file
+# vim: set noexpandtab
