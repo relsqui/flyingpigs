@@ -1,12 +1,22 @@
 #!/bin/sh
 
+# what to do for each server we're checking on
 check_on() {
-    # what to do on each server we connect to
     echo -n "." >&2
-    ssh $1 "uname -a" >> "$tempdir/unames"
+
+    # get the fields we want and no headers in a portable way
+    ssh $1 'ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=' > $tempdir/servers/$1
+
+    # prepend the server name to each process and collect them
+    while read proc; do
+        if [ -n "$proc" ]; then
+            echo $1 $proc >> $tempdir/processes
+        fi
+    done < $tempdir/servers/$1
+
+    # mark server as complete, end waiting loop if this is the last one
     echo $1 >> $tempdir/done
     if [ `cat $tempdir/done | wc -l` -eq $server_count ]; then
-        # this is the last one
         touch $tempdir/ready
     fi
 }
@@ -14,6 +24,7 @@ check_on() {
 
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
+mkdir $tempdir/servers
 
 # collect and count the servers
 servers=`netgrouplist linux-login-sys ece-secure-sys cs-secure-sys`
@@ -37,7 +48,7 @@ echo " done." >&2
 
 
 # handle the collected data
-cat $tempdir/unames
+echo `cat $tempdir/processes | wc -l` processes found.
 
 
 # clean up
