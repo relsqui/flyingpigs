@@ -1,23 +1,38 @@
 #!/bin/sh
 
-# what to do for each server we're checking on
 check_on() {
-    echo -n "." >&2
-
-    # get the fields we want and no headers in a portable way
+    # get the fields we want, and no headers, in a portable way
     ssh $1 'ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=' > $tempdir/servers/$1
 
-    # prepend the server name to each process and collect them
+    short_name=`echo $1 | sed 's/.pdx.edu$//'`
     while read proc; do
         if [ -n "$proc" ]; then
-            echo $1 $proc >> $tempdir/processes
+            echo $proc | while read pid user tty cpu mem nice command; do
+                # truncate numbers so bash can compare them
+                cpu=`echo $cpu | cut -d '.' -f 1`
+                mem=`echo $mem | cut -d '.' -f 1`
+
+                # every field should have at least a placeholder
+                if [ -z $tty ]; then tty="-"; fi
+                if [ -z $cpu ]; then cpu="-"; fi
+                if [ -z $mem ]; then mem="-"; fi
+                if [ -z $nice ]; then nice="-"; fi
+
+                # check memory and cpu usage and record if necessary
+                if [ $cpu -ge 10 -o $mem -ge 10 ]; then
+					# these are tab characters, so we can split on them later
+                    echo "$short_name	$pid	$user	$tty	$cpu	$mem	$nice	$command" >> $tempdir/processes
+                fi 2>/dev/null
+            done
         fi
     done < $tempdir/servers/$1
 
-    # mark server as complete, end waiting loop if this is the last one
+    # mark server as complete, and end waiting loop if this is the last one
     echo $1 >> $tempdir/done
     if [ `cat $tempdir/done | wc -l` -eq $server_count ]; then
         touch $tempdir/ready
+    else
+        echo -n "." >&2
     fi
 }
 
@@ -33,11 +48,10 @@ export checked_count=0
 
 # initialize ssh authentication
 eval `ssh-agent` >/dev/null
-ssh-add
-
+ssh-add >&2
 
 # connect in parallel to speed things up
-echo -n "Checking servers " >&2
+echo -n "Checking $server_count servers " >&2
 for server in $servers; do
     check_on $server &
 done
@@ -46,10 +60,8 @@ done
 while [ ! -e $tempdir/ready ]; do sleep .1; done
 echo " done." >&2
 
-
-# handle the collected data
-echo `cat $tempdir/processes | wc -l` processes found.
-
+# display the results, nicely formatted
+column -ts "	" $tempdir/processes | cut -c 1-`tput cols`
 
 # clean up
-rm -rf $tempdir
+rm -r $tempdir
