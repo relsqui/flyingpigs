@@ -37,6 +37,23 @@ check_on() {
 }
 
 
+# read environment variables and apply defaults if needed
+if [ -z "$RESOURCE_THRESHOLD" ]; then
+    cpu_default=5
+    mem_default=1
+else
+    cpu_default=$RESOURCE_THRESHOLD
+    mem_default=$RESOURCE_THRESHOLD
+fi
+if [ -z "$CPU_THRESHOLD" ]; then
+    CPU_THRESHOLD=$cpu_default
+fi
+if [ -z "$MEM_THRESHOLD" ]; then
+    MEM_THRESHOLD=$mem_default
+fi
+echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
+echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
+
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/servers
