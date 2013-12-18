@@ -9,13 +9,13 @@ for arg; do
         -h|--help)
             name=`basename $0`
             cat <<EOF
-usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SERVER [SERVER ...]
+usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SYSTEM [SYSTEM ...]
 
-Shows processes on each SERVER which may be a runaway, given the criteria
+Shows processes on each SYSTEM which may be runaways, given the criteria
 specified either on the command line or in the environment variables.
 
 positional arguments:
-  SERVER            addresses of servers to ssh into and check for runaways
+  SYSTEM            addresses of systems to ssh into and check for runaways
 
 optional arguments:
   -h, --help        show this help message and exit
@@ -50,7 +50,7 @@ EOF
         ;;
         --)
             shift
-            servers=`echo "$*" | sed "s/'//g"`
+            systems=`echo "$*" | sed "s/'//g"`
         ;;
     esac
 done
@@ -72,16 +72,16 @@ int() {
     echo -n $1 | cut -d '.' -f 1
 }
 
-# what to do for each server we're checking on
+# what to do for each systems we're checking on
 check_on() {
     short_name=`echo $1 | sed 's/.pdx.edu$//'`
 
     # get the fields we want, and no headers, in a portable way
-    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/servers/$1
-    load=`tail -n 1 $tempdir/servers/$1 | sed 's/.*load average: *//' |\
+    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1
+    load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
-    cat $tempdir/servers/$1 | head -n -1 | while read proc; do
+    cat $tempdir/systems/$1 | head -n -1 | while read proc; do
         if [ -n "$proc" ]; then
             echo $proc | while read pid user tty cpu mem nice command; do
                 # truncate numbers so bash can compare them
@@ -108,9 +108,9 @@ check_on() {
         fi
     done
 
-    # mark server as complete, and end waiting loop if this is the last one
+    # mark system as complete, and end waiting loop if this is the last one
     echo $1 >> $tempdir/done
-    if [ `cat $tempdir/done | wc -l` -eq $server_count ]; then
+    if [ `cat $tempdir/done | wc -l` -eq $system_count ]; then
         touch $tempdir/ready
     else
         echo -n "." >&2
@@ -141,15 +141,15 @@ echo LOAD_THRESHOLD=$LOAD_THRESHOLD >&2
 
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
-mkdir $tempdir/servers
+mkdir $tempdir/systems
 touch $tempdir/processes
 touch $tempdir/load
-echo "SERVER	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
+echo "SYSTEM	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
-# collect and count the servers
-server_count=`echo "$servers" | wc -w`
-s=`plural $server_count`
-echo "Checking $server_count server$s." >&2
+# collect and count the systems
+system_count=`echo "$systems" | wc -w`
+s=`plural $system_count`
+echo "Checking $system_count system$s." >&2
 
 # initialize ssh authentication
 eval `ssh-agent` >/dev/null
@@ -157,11 +157,11 @@ ssh-add >&2
 
 # connect in parallel to speed things up
 echo -n "Searching " >&2
-for server in $servers; do
-    check_on $server &
+for system in $systems; do
+    check_on $system &
 done
 
-# stall until all the servers have reported back
+# stall until all the systems have reported back
 while [ ! -e $tempdir/ready ]; do sleep .1; done
 echo ". done." >&2
 
