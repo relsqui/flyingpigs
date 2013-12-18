@@ -97,6 +97,7 @@ check_on() {
             done
         fi
     done
+
     echo $load | while read load1 load5 load15; do
         load1=`int $load1`
         load5=`int $load5`
@@ -150,6 +151,10 @@ echo "SYSTEM	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 system_count=`echo "$systems" | wc -w`
 s=`plural $system_count`
 echo "Checking $system_count system$s." >&2
+if [ $system_count -eq 0 ]; then
+    echo "Nothing to check. Exiting."
+    exit
+fi
 
 # initialize ssh authentication
 eval `ssh-agent` >/dev/null
