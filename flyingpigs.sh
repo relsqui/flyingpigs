@@ -9,11 +9,14 @@ for arg; do
         -h|--help)
             name=`basename $0`
             cat <<EOF
-usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE]
+usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SERVER [SERVER ...]
 
-Shows processes whose CPU or memory percentage usage exceeds the settings
-given. You can also export the CPU_THRESHOLD, MEM_THRESHOLD, and RES_THRESHOLD
-variables directly if you prefer.
+Shows processes on each SERVER whose CPU or memory percentage usage exceeds the
+settings given. You can also export the CPU_THRESHOLD, MEM_THRESHOLD, and
+RES_THRESHOLD variables directly if you prefer.
+
+positional arguments:
+  SERVER            addresses of servers to ssh into and check for runaways
 
 optional arguments:
   -h, --help        show this help message and exit
@@ -34,6 +37,10 @@ EOF
         -r|--res|--resource)
             RES_THRESHOLD=`echo "$2" | sed "s/'//g"`
             shift; shift
+        ;;
+        --)
+            shift
+            servers=`echo "$*" | sed "s/'//g"`
         ;;
     esac
 done
@@ -96,9 +103,7 @@ touch $tempdir/processes
 echo "SERVER	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
 # collect and count the servers
-servers=`netgrouplist linux-login-sys ece-secure-sys cs-secure-sys`
 server_count=`echo "$servers" | wc -w`
-export checked_count=0
 
 # initialize ssh authentication
 eval `ssh-agent` >/dev/null
