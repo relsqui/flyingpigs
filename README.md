@@ -22,7 +22,7 @@ environment variables and defaults:
   CPU_THRESHOLD=10
   MEM_THRESHOLD=5
   RES_THRESHOLD=
-  LOAD_THRESHOLD=5
+  LOAD_THRESHOLD=3
 ```
 
 ### example ###
@@ -30,11 +30,11 @@ environment variables and defaults:
 [finnre@rita flyingpigs]$ flyingpigs `netgrouplist linux-login-sys ece-secure-sys cs-secure-sys | cut -d . -f 1`
 CPU_THRESHOLD=10
 MEM_THRESHOLD=5
-LOAD_THRESHOLD=5
+LOAD_THRESHOLD=3
 Checking 43 systems.
 Enter passphrase for /u/finnre/.ssh/id_rsa:
 Identity added: /u/finnre/.ssh/id_rsa (/u/finnre/.ssh/id_rsa)
-Searching ........................................... done.
+Collecting information ........................................... done.
 
 No systems under heavy load.
 

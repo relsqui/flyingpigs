@@ -28,7 +28,7 @@ environment variables and defaults:
   CPU_THRESHOLD=10
   MEM_THRESHOLD=5
   RES_THRESHOLD=
-  LOAD_THRESHOLD=5
+  LOAD_THRESHOLD=3
 EOF
             exit
         ;;
@@ -134,7 +134,7 @@ if [ -z "$MEM_THRESHOLD" ]; then
     MEM_THRESHOLD=$mem_default
 fi
 if [ -z "$LOAD_THRESHOLD" ]; then
-    LOAD_THRESHOLD=5
+    LOAD_THRESHOLD=3
 fi
 echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
 echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
@@ -161,7 +161,7 @@ eval `ssh-agent` >/dev/null
 ssh-add >&2
 
 # connect in parallel to speed things up
-echo -n "Searching " >&2
+echo -n "Collecting information " >&2
 for system in $systems; do
     check_on $system &
 done
@@ -196,6 +196,7 @@ fi
 
 # clean up
 rm -r $tempdir
+ssh-agent -k >/dev/null
 
 
 # modeline to tell vim not to expand the tabs in this file
