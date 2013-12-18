@@ -77,7 +77,7 @@ check_on() {
     short_name=`echo $1 | sed 's/.pdx.edu$//'`
 
     # get the fields we want, and no headers, in a portable way
-    ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/servers/$1
+    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/servers/$1
     load=`tail -n 1 $tempdir/servers/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
