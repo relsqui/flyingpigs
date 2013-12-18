@@ -77,13 +77,13 @@ check_on() {
     short_name=$1
 
     # get the fields we want, and no headers, in a portable way
-    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1
+    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
     cat $tempdir/systems/$1 | head -n -1 | while read proc; do
         if [ -n "$proc" ]; then
-            echo $proc | while read pid user tty cpu mem nice command; do
+            echo $proc | while read pid user tty stime cpu mem nice command; do
                 # truncate numbers so bash can compare them
                 intcpu=`int $cpu`
                 intmem=`int $mem`
@@ -92,7 +92,7 @@ check_on() {
                 if [ $intcpu -ge $CPU_THRESHOLD -o\
                      $intmem -ge $MEM_THRESHOLD ]; then
 					# these are tab characters, so we can split on them later
-                    echo "$short_name	$pid	$user	$tty	$cpu	$mem	$nice	$command" >> $tempdir/processes
+                    echo "$short_name	$pid	$user	$tty	$stime	$cpu	$mem	$nice	$command" >> $tempdir/processes
                 fi 2>/dev/null
             done
         fi
@@ -145,7 +145,7 @@ tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/systems
 touch $tempdir/processes
 touch $tempdir/load
-echo "SYSTEM	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
+echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
 # collect and count the systems
 system_count=`echo "$systems" | wc -w`
