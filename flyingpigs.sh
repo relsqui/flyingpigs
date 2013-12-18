@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # parse command-line switches and respond accordingly
-args=`getopt -o c:m:r:h -l cpu:,mem:,memory:,res:,resource:,help -- $*`
+args=`getopt -o hc:m:r:l: -l help,cpu:,mem:,memory:,res:,resource:,load: -- $*`
 set -- $args
 
 for arg; do
@@ -11,18 +11,24 @@ for arg; do
             cat <<EOF
 usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SERVER [SERVER ...]
 
-Shows processes on each SERVER whose CPU or memory percentage usage exceeds the
-settings given. You can also export the CPU_THRESHOLD, MEM_THRESHOLD, and
-RES_THRESHOLD variables directly if you prefer.
+Shows processes on each SERVER which may be a runaway, given the criteria
+specified either on the command line or in the environment variables.
 
 positional arguments:
   SERVER            addresses of servers to ssh into and check for runaways
 
 optional arguments:
   -h, --help        show this help message and exit
-  -c, --cpu         set the minimum %CPU usage to detect (default: 10)
-  -m, --mem[ory]    set the minimum %memory usage to detect (default: 5)
+  -c, --cpu         set the minimum %CPU usage to report
+  -m, --mem[ory]    set the minimum %memory usage to report
   -r, --res[ource]  set default for both CPU and memory thresholds
+  -l, --load        set the minimum load to report
+
+environment variables and defaults:
+  CPU_THRESHOLD=10
+  MEM_THRESHOLD=5
+  RES_THRESHOLD=
+  LOAD_THRESHOLD=5
 EOF
             exit
         ;;
@@ -36,6 +42,10 @@ EOF
         ;;
         -r|--res|--resource)
             RES_THRESHOLD=`echo "$2" | sed "s/'//g"`
+            shift; shift
+        ;;
+        -l|--load)
+            LOAD_THRESHOLD=`echo "$2" | sed "s/'//g"`
             shift; shift
         ;;
         --)
@@ -57,18 +67,26 @@ plural() {
     fi
 }
 
+# utility for truncating floating-point numbers
+int() {
+    echo -n $1 | cut -d '.' -f 1
+}
+
 # what to do for each server we're checking on
 check_on() {
-    # get the fields we want, and no headers, in a portable way
-    ssh $1 'ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=' > $tempdir/servers/$1
-
     short_name=`echo $1 | sed 's/.pdx.edu$//'`
-    while read proc; do
+
+    # get the fields we want, and no headers, in a portable way
+    ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/servers/$1
+    load=`tail -n 1 $tempdir/servers/$1 | sed 's/.*load average: *//' |\
+        tr ',' ' '`
+
+    cat $tempdir/servers/$1 | head -n -1 | while read proc; do
         if [ -n "$proc" ]; then
             echo $proc | while read pid user tty cpu mem nice command; do
                 # truncate numbers so bash can compare them
-                intcpu=`echo $cpu | cut -d '.' -f 1`
-                intmem=`echo $mem | cut -d '.' -f 1`
+                intcpu=`int $cpu`
+                intmem=`int $mem`
 
                 # check memory and cpu usage and record if necessary
                 if [ $intcpu -ge $CPU_THRESHOLD -o\
@@ -78,7 +96,17 @@ check_on() {
                 fi 2>/dev/null
             done
         fi
-    done < $tempdir/servers/$1
+    done
+    echo $load | while read load1 load5 load15; do
+        load1=`int $load1`
+        load5=`int $load5`
+        load15=`int $load15`
+        if [ $load1 -ge $LOAD_THRESHOLD -o \
+             $load5 -ge $LOAD_THRESHOLD -o \
+             $load15 -ge $LOAD_THRESHOLD ]; then
+            echo "$short_name is under high load: $load" >> $tempdir/load
+        fi
+    done
 
     # mark server as complete, and end waiting loop if this is the last one
     echo $1 >> $tempdir/done
@@ -104,13 +132,18 @@ fi
 if [ -z "$MEM_THRESHOLD" ]; then
     MEM_THRESHOLD=$mem_default
 fi
+if [ -z "$LOAD_THRESHOLD" ]; then
+    LOAD_THRESHOLD=5
+fi
 echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
 echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
+echo LOAD_THRESHOLD=$LOAD_THRESHOLD >&2
 
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/servers
 touch $tempdir/processes
+touch $tempdir/load
 echo "SERVER	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
 # collect and count the servers
@@ -132,14 +165,23 @@ done
 while [ ! -e $tempdir/ready ]; do sleep .1; done
 echo ". done." >&2
 
-# display the results, nicely formatted
+echo >&2
+
+# display load results, nicely formatted
+load=`cat $tempdir/load | wc -l`
+if [ $load -eq 0 ]; then
+    echo "No systems under heavy load." >&2
+else
+    cat $tempdir/load
+fi
+
+echo >&2
+
+# display runaway results, nicely formatted
 candidates=`cat $tempdir/processes | wc -l`
 if [ $candidates -eq 0 ]; then
     echo "Found no potential runaways." >&2
 else
-    s=`plural $candidates`
-    echo "Found $candidates potential runaway$s." >&2
-    echo >&2
     cat $tempdir/header $tempdir/processes | column -nts "	" |\
         cut -c 1-`tput cols` > $tempdir/formatted
     # output headers on stderr, content on stdout
