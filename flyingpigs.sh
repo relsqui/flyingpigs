@@ -72,9 +72,9 @@ int() {
     echo -n $1 | cut -d '.' -f 1
 }
 
-# what to do for each systems we're checking on
+# what to do for each system we're checking on
 check_on() {
-    short_name=`echo $1 | sed 's/.pdx.edu$//'`
+    short_name=$1
 
     # get the fields we want, and no headers, in a portable way
     nice ssh $1 "ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1
