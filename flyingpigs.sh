@@ -46,6 +46,17 @@ EOF
 done
 
 
+# utility for making plural nouns display properly
+plural() {
+    if [ "$1" -eq 1 ]; then
+        echo -n ""
+        return 1
+    else
+        echo -n "s"
+        return 0
+    fi
+}
+
 # what to do for each server we're checking on
 check_on() {
     # get the fields we want, and no headers, in a portable way
@@ -104,27 +115,30 @@ echo "SERVER	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
 # collect and count the servers
 server_count=`echo "$servers" | wc -w`
+s=`plural $server_count`
+echo "Checking $server_count server$s." >&2
 
 # initialize ssh authentication
 eval `ssh-agent` >/dev/null
 ssh-add >&2
 
 # connect in parallel to speed things up
-echo -n "Checking $server_count servers " >&2
+echo -n "Searching " >&2
 for server in $servers; do
     check_on $server &
 done
 
 # stall until all the servers have reported back
 while [ ! -e $tempdir/ready ]; do sleep .1; done
-echo " done." >&2
+echo ". done." >&2
 
 # display the results, nicely formatted
 candidates=`cat $tempdir/processes | wc -l`
 if [ $candidates -eq 0 ]; then
     echo "Found no potential runaways." >&2
 else
-    echo "Found $candidates potential runaways." >&2
+    s=`plural $candidates`
+    echo "Found $candidates potential runaway$s." >&2
     echo >&2
     cat $tempdir/header $tempdir/processes | column -nts "	" |\
         cut -c 1-`tput cols` > $tempdir/formatted
