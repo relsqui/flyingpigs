@@ -1,5 +1,45 @@
 #!/bin/sh
 
+# parse command-line switches and respond accordingly
+args=`getopt -o c:m:r:h -l cpu:,mem:,memory:,res:,resource:,help -- $*`
+set -- $args
+
+for arg; do
+    case "$arg" in
+        -h|--help)
+            name=`basename $0`
+            cat <<EOF
+usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE]
+
+Shows processes whose CPU or memory percentage usage exceeds the settings
+given. You can also export the CPU_THRESHOLD, MEM_THRESHOLD, and RES_THRESHOLD
+variables directly if you prefer.
+
+optional arguments:
+  -h, --help        show this help message and exit
+  -c, --cpu         set the minimum %CPU usage to detect (default: 10)
+  -m, --mem[ory]    set the minimum %memory usage to detect (default: 5)
+  -r, --res[ource]  set default for both CPU and memory thresholds
+EOF
+            exit
+        ;;
+        -c|--cpu)
+            CPU_THRESHOLD=`echo "$2" | sed "s/'//g"`
+            shift; shift
+        ;;
+        -m|--mem|--memory)
+            MEM_THRESHOLD=`echo "$2" | sed "s/'//g"`
+            shift; shift
+        ;;
+        -r|--res|--resource)
+            RES_THRESHOLD=`echo "$2" | sed "s/'//g"`
+            shift; shift
+        ;;
+    esac
+done
+
+
+# what to do for each server we're checking on
 check_on() {
     # get the fields we want, and no headers, in a portable way
     ssh $1 'ps -e -o pid= -o user= -o tty= -o pcpu= -o pmem= -o nice= -o args=' > $tempdir/servers/$1
@@ -12,14 +52,9 @@ check_on() {
                 intcpu=`echo $cpu | cut -d '.' -f 1`
                 intmem=`echo $mem | cut -d '.' -f 1`
 
-                # every field should have at least a placeholder
-                if [ -z $tty ]; then tty="-"; fi
-                if [ -z $cpu ]; then cpu="-"; fi
-                if [ -z $mem ]; then mem="-"; fi
-                if [ -z $nice ]; then nice="-"; fi
-
                 # check memory and cpu usage and record if necessary
-                if [ $intcpu -ge 10 -o $intmem -ge 10 ]; then
+                if [ $intcpu -ge $CPU_THRESHOLD -o\
+                     $intmem -ge $MEM_THRESHOLD ]; then
 					# these are tab characters, so we can split on them later
                     echo "$short_name	$pid	$user	$tty	$cpu	$mem	$nice	$command" >> $tempdir/processes
                 fi 2>/dev/null
@@ -37,10 +72,10 @@ check_on() {
 }
 
 
-# read environment variables and apply defaults if needed
+# apply default threshold variables if necessary
 if [ -z "$RESOURCE_THRESHOLD" ]; then
-    cpu_default=5
-    mem_default=1
+    cpu_default=10
+    mem_default=5
 else
     cpu_default=$RESOURCE_THRESHOLD
     mem_default=$RESOURCE_THRESHOLD
@@ -57,6 +92,7 @@ echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/servers
+touch $tempdir/processes
 echo "SERVER	PID	USER	TTY	%CPU	%MEM	NI	COMMAND" > $tempdir/header
 
 # collect and count the servers
@@ -81,11 +117,11 @@ echo " done." >&2
 # display the results, nicely formatted
 candidates=`cat $tempdir/processes | wc -l`
 if [ $candidates -eq 0 ]; then
-    echo "Found no potential runaways."
+    echo "Found no potential runaways." >&2
 else
-    echo "Found $candidates potential runaways."
-    echo
-    cat $tempdir/header $tempdir/processes | column -ts "	" |\
+    echo "Found $candidates potential runaways." >&2
+    echo >&2
+    cat $tempdir/header $tempdir/processes | column -nts "	" |\
         cut -c 1-`tput cols` > $tempdir/formatted
     # output headers on stderr, content on stdout
     head -n 1 $tempdir/formatted >&2
