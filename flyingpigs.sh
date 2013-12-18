@@ -77,7 +77,7 @@ check_on() {
     short_name=$1
 
     # get the fields we want, and no headers, in a portable way
-    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1
+    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1 || return
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
@@ -91,7 +91,7 @@ check_on() {
                 # check memory and cpu usage and record if necessary
                 if [ $intcpu -ge $CPU_THRESHOLD -o\
                      $intmem -ge $MEM_THRESHOLD ]; then
-					# these are tab characters, so we can split on them later
+                    # these are tab characters, so we can split on them later
                     echo "$short_name	$pid	$user	$tty	$stime	$cpu	$mem	$nice	$command" >> $tempdir/processes
                 fi 2>/dev/null
             done
@@ -156,9 +156,18 @@ if [ $system_count -eq 0 ]; then
     exit
 fi
 
-# initialize ssh authentication
-eval `ssh-agent` >/dev/null
-ssh-add >&2
+# initialize an ssh agent if necessary
+if [ -z "$SSH_AGENT_PID" ]; then
+    eval `ssh-agent` >/dev/null
+    kill_ssh_agent=true
+else
+    kill_ssh_agent=
+fi
+
+# add keys, if there aren't any already
+if ! ssh-add -l >/dev/null; then
+    ssh-add >&2
+fi
 
 # connect in parallel to speed things up
 echo -n "Collecting information " >&2
@@ -196,7 +205,9 @@ fi
 
 # clean up
 rm -r $tempdir
-ssh-agent -k >/dev/null
+if [ -n "$kill_ssh_agent" ]; then
+    eval `ssh-agent -k` >/dev/null
+fi
 
 
 # modeline to tell vim not to expand the tabs in this file

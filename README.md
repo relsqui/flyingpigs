@@ -1,7 +1,11 @@
 flyingpigs
 ==========
-tracks down and reports runaway processes which could potentially have a negative impact on people using your systems. For best results, set up ssh key authentication on the remote systems so you don't have to retype a password for each one.
+tracks down and reports runaway processes which could potentially have a negative impact on people using your systems. Just invoke it with the address(es) of one or more hosts you want to check on.
 
+### authentication ###
+flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time. It's handy, but not necessary, to also initialize the ssh-agent with ``eval `ssh-agent`; ssh-add``; that way you won't have to re-enter your passphrase(s) every time you run flyingpigs.
+
+### quick reference ###
 ```
 usage: flyingpigs [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SYSTEM [SYSTEM ...]
 
