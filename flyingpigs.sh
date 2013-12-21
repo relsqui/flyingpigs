@@ -77,7 +77,7 @@ check_on() {
     short_name=$1
 
     # get the fields we want, and no headers, in a portable way
-    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1 || return
+    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1 2>/dev/null || return
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
