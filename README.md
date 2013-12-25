@@ -3,11 +3,11 @@ flyingpigs
 tracks down and reports runaway processes which could potentially have a negative impact on the responsiveness of your systems. Just invoke it with the address(es) of one or more hosts you want to check on.
 
 ### authentication ###
-flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time.
+flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time. Failing that, flyingpigs will attempt to guess when you'll need to authenticate interactively and keep those processes in the foreground (instead of backgrounding them to save time). You can do this for all systems being checked with --serial.
 
 ### quick reference ###
 ```
-usage: flyingpigs [-h] [-w] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
+usage: flyingpigs [-h] [-w] [-s] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
 
 Shows processes on each SYSTEM which may be runaways, given the criteria
 specified either on the command line or in the environment variables.
@@ -18,6 +18,7 @@ positional arguments:
 optional arguments:
   -h, --help        show this help message and exit
   -w, --wrap        wrap output instead of truncating to fit screen
+  -s, --serial      connect to hosts one by one instead of in the background
   -c, --cpu         set the minimum %CPU usage to report
   -m, --mem[ory]    set the minimum %memory usage to report
   -r, --res[ource]  set default for both CPU and memory thresholds

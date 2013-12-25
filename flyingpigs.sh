@@ -1,17 +1,18 @@
 #!/bin/sh
 
 # parse command-line switches and respond accordingly
-args=`getopt -o hwc:m:r:l: \
-     -l help,wrap,cpu:,mem:,memory:,res:,resource:,load: -- $*`
+args=`getopt -o hwsc:m:r:l: \
+     -l help,wrap,serial,cpu:,mem:,memory:,res:,resource:,load: -- $*`
 set -- $args
 
 WRAP=false
+SERIAL=false
 for arg; do
     case "$arg" in
         -h|--help)
             name=`basename $0`
             cat <<EOF
-usage: $name [-h] [-w] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
+usage: $name [-h] [-w] [-s] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
 
 Shows processes on each SYSTEM which may be runaways, given the criteria
 specified either on the command line or in the environment variables.
@@ -22,6 +23,7 @@ positional arguments:
 optional arguments:
   -h, --help        show this help message and exit
   -w, --wrap        wrap output instead of truncating to fit screen
+  -s, --serial      connect to hosts one by one instead of in the background
   -c, --cpu         set the minimum %CPU usage to report
   -m, --mem[ory]    set the minimum %memory usage to report
   -r, --res[ource]  set default for both CPU and memory thresholds
@@ -37,6 +39,10 @@ EOF
         ;;
         -w|--wrap)
             WRAP=true
+            shift;
+        ;;
+        -s|--serial)
+            SERIAL=true
             shift;
         ;;
         -c|--cpu)
@@ -124,9 +130,8 @@ check_on() {
     echo $1 >> $tempdir/done
     if [ `cat $tempdir/done | wc -l` -eq $system_count ]; then
         touch $tempdir/ready
-    else
-        echo -n "." >&2
     fi
+    echo -n "." >&2
 }
 
 
@@ -184,19 +189,25 @@ if ! ssh-add -l >/dev/null; then
     ssh-add >&2
 fi
 
+# still no keys? we'll probably need to authenticate; use serial mode
+if ! ssh-add -l >/dev/null; then
+    SERIAL=true
+fi
+
 echo -n "Collecting information " >&2
 for system in $systems; do
-    # auth unknown hosts interactively if needed
-    if ! grep "^$system" ~/.ssh/known_hosts >/dev/null; then
-        ssh $system exit
+    if ! $SERIAL && grep "^$system[, ]" ~/.ssh/known_hosts >/dev/null; then
+        # connect in parallel to speed things up
+        check_on $system &
+    else
+        # except for unknown hosts or if serial mode is on
+        check_on $system
     fi
-    # then connect in parallel to speed things up
-    check_on $system &
 done
 
 # stall until all the systems have reported back
 while [ ! -e $tempdir/ready ]; do sleep .1; done
-echo ". done." >&2
+echo " done." >&2
 
 echo >&2
 
