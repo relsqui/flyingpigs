@@ -81,13 +81,16 @@ int() {
 
 # what to do for each system we're checking on
 check_on() {
-    short_name=$1
-
     # get the fields we want, and no headers, in a portable way
-    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= -o nice= -o args=; uptime" > $tempdir/systems/$1 2>/dev/null || return
+    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu=\
+        -o pmem= -o nice= -o args=; uptime"\
+        > $tempdir/systems/$1 2>/dev/null || return
+
+    # copy the uptime line off the end and truncate to just the load numbers
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
+    # read our file of collected processes, ignoring uptime line at the end
     cat $tempdir/systems/$1 | head -n -1 | while read proc; do
         if [ -n "$proc" ]; then
             echo $proc | while read pid user tty stime cpu mem nice command; do
@@ -95,16 +98,17 @@ check_on() {
                 intcpu=`int $cpu`
                 intmem=`int $mem`
 
-                # check memory and cpu usage and record if necessary
+                # check memory and cpu usage and record the process if necessary
                 if [ $intcpu -ge $CPU_THRESHOLD -o\
                      $intmem -ge $MEM_THRESHOLD ]; then
                     # these are tab characters, so we can split on them later
-                    echo "$short_name	$pid	$user	$tty	$stime	$cpu	$mem	$nice	$command" >> $tempdir/processes
+                    echo "$1	$pid	$user	$tty	$stime	$cpu	$mem	$nice	$command" >> $tempdir/processes
                 fi 2>/dev/null
             done
         fi
     done
 
+    # check 1- 5- and 15-minute load averages against threshold
     echo $load | while read load1 load5 load15; do
         load1=`int $load1`
         load5=`int $load5`
@@ -112,7 +116,7 @@ check_on() {
         if [ $load1 -ge $LOAD_THRESHOLD -o \
              $load5 -ge $LOAD_THRESHOLD -o \
              $load15 -ge $LOAD_THRESHOLD ]; then
-            echo "$short_name is under high load: $load" >> $tempdir/load
+            echo "$1 is under high load: $load" >> $tempdir/load
         fi
     done
 
@@ -134,6 +138,8 @@ else
     cpu_default=$RESOURCE_THRESHOLD
     mem_default=$RESOURCE_THRESHOLD
 fi
+
+# override those if other values were provided
 if [ -z "$CPU_THRESHOLD" ]; then
     CPU_THRESHOLD=$cpu_default
 fi
@@ -143,6 +149,7 @@ fi
 if [ -z "$LOAD_THRESHOLD" ]; then
     LOAD_THRESHOLD=3
 fi
+
 echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
 echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
 echo LOAD_THRESHOLD=$LOAD_THRESHOLD >&2
@@ -152,14 +159,15 @@ tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/systems
 touch $tempdir/processes
 touch $tempdir/load
-echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	NI	COMMAND" > $tempdir/header
+echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	NI	COMMAND"\
+    > $tempdir/header
 
 # collect and count the systems
 system_count=`echo "$systems" | wc -w`
 s=`plural $system_count`
 echo "Checking $system_count system$s." >&2
 if [ $system_count -eq 0 ]; then
-    echo "Nothing to check. Exiting."
+    echo "Nothing to check. Exiting." >&2
     exit
 fi
 
@@ -168,7 +176,7 @@ if [ -z "$SSH_AGENT_PID" ]; then
     eval `ssh-agent` >/dev/null
     kill_ssh_agent=true
 else
-    kill_ssh_agent=
+    kill_ssh_agent=false
 fi
 
 # add keys, if there aren't any already
@@ -176,9 +184,13 @@ if ! ssh-add -l >/dev/null; then
     ssh-add >&2
 fi
 
-# connect in parallel to speed things up
 echo -n "Collecting information " >&2
 for system in $systems; do
+    # auth unknown hosts interactively if needed
+    if ! grep "^$system" ~/.ssh/known_hosts >/dev/null; then
+        ssh $system exit
+    fi
+    # then connect in parallel to speed things up
     check_on $system &
 done
 
@@ -217,7 +229,7 @@ fi
 
 # clean up
 rm -r $tempdir
-if [ -n "$kill_ssh_agent" ]; then
+if [ $kill_ssh_agent ]; then
     eval `ssh-agent -k` >/dev/null
 fi
 
