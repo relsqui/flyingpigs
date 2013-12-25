@@ -12,22 +12,23 @@ for arg; do
         -h|--help)
             name=`basename $0`
             cat <<EOF
-usage: $name [-h] [-w] [-s] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
+usage: $name [-h] [-w] [-s] [-c C] [-m M] [-r R] [-l L] SYS [SYS ...]
 
-Shows processes on each SYSTEM which may be runaways, given the criteria
-specified either on the command line or in the environment variables.
+Reports processes on each system which may be runaways, as well as any system
+which is under high load. You can specify the criteria for these using the
+command line arguments, environment variables, or both.
 
 positional arguments:
-  SYSTEM            addresses of systems to ssh into and check for runaways
+  SYS                 name or address of a system to check for runaways
 
 optional arguments:
-  -h, --help        show this help message and exit
-  -w, --wrap        wrap output instead of truncating to fit screen
-  -s, --serial      connect to hosts one by one instead of in the background
-  -c, --cpu         set the minimum %CPU usage to report
-  -m, --mem[ory]    set the minimum %memory usage to report
-  -r, --res[ource]  set default for both CPU and memory thresholds
-  -l, --load        set the minimum load to report
+  -h, --help          show this help message and exit
+  -w, --wrap          wrap output instead of truncating to fit screen
+  -s, --serial        connect to hosts one by one instead of in the background
+  -c, --cpu C         set the minimum reported CPU usage to C%
+  -m, --mem[ory] M    set the minimum reported memory usage to M%
+  -r, --res[ource] R  set default for both CPU and memory thresholds
+  -l, --load L        set the minimum reported load average to L
 
 environment variables and defaults:
   CPU_THRESHOLD=10
