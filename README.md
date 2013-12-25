@@ -1,13 +1,13 @@
 flyingpigs
 ==========
-tracks down and reports runaway processes which could potentially have a negative impact on people using your systems. Just invoke it with the address(es) of one or more hosts you want to check on.
+tracks down and reports runaway processes which could potentially have a negative impact on the responsiveness of your systems. Just invoke it with the address(es) of one or more hosts you want to check on.
 
 ### authentication ###
-flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time. It's handy, but not necessary, to also initialize the ssh-agent with ``eval `ssh-agent`; ssh-add``; that way you won't have to re-enter your passphrase(s) every time you run flyingpigs.
+flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time.
 
 ### quick reference ###
 ```
-usage: flyingpigs [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SYSTEM [SYSTEM ...]
+usage: flyingpigs [-h] [-w] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
 
 Shows processes on each SYSTEM which may be runaways, given the criteria
 specified either on the command line or in the environment variables.
@@ -17,6 +17,7 @@ positional arguments:
 
 optional arguments:
   -h, --help        show this help message and exit
+  -w, --wrap        wrap output instead of truncating to fit screen
   -c, --cpu         set the minimum %CPU usage to report
   -m, --mem[ory]    set the minimum %memory usage to report
   -r, --res[ource]  set default for both CPU and memory thresholds

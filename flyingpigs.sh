@@ -1,15 +1,17 @@
 #!/bin/sh
 
 # parse command-line switches and respond accordingly
-args=`getopt -o hc:m:r:l: -l help,cpu:,mem:,memory:,res:,resource:,load: -- $*`
+args=`getopt -o hwc:m:r:l: \
+     -l help,wrap,cpu:,mem:,memory:,res:,resource:,load: -- $*`
 set -- $args
 
+WRAP=false
 for arg; do
     case "$arg" in
         -h|--help)
             name=`basename $0`
             cat <<EOF
-usage: $name [-h] [-c CPU] [-m MEMORY] [-r RESOURCE] SYSTEM [SYSTEM ...]
+usage: $name [-h] [-w] [-c CPU] [-m MEM] [-r RES] SYSTEM [SYSTEM ...]
 
 Shows processes on each SYSTEM which may be runaways, given the criteria
 specified either on the command line or in the environment variables.
@@ -19,6 +21,7 @@ positional arguments:
 
 optional arguments:
   -h, --help        show this help message and exit
+  -w, --wrap        wrap output instead of truncating to fit screen
   -c, --cpu         set the minimum %CPU usage to report
   -m, --mem[ory]    set the minimum %memory usage to report
   -r, --res[ource]  set default for both CPU and memory thresholds
@@ -31,6 +34,10 @@ environment variables and defaults:
   LOAD_THRESHOLD=3
 EOF
             exit
+        ;;
+        -w|--wrap)
+            WRAP=true
+            shift;
         ;;
         -c|--cpu)
             CPU_THRESHOLD=`echo "$2" | sed "s/'//g"`
@@ -196,8 +203,13 @@ candidates=`cat $tempdir/processes | wc -l`
 if [ $candidates -eq 0 ]; then
     echo "Found no potential runaways." >&2
 else
-    cat $tempdir/header $tempdir/processes | column -nts "	" |\
-        cut -c 1-`tput cols` > $tempdir/formatted
+    if $WRAP; then
+        cat $tempdir/header $tempdir/processes |\
+            column -nts "	" > $tempdir/formatted
+    else
+        cat $tempdir/header $tempdir/processes |\
+            column -nts "	" | cut -c 1-`tput cols` > $tempdir/formatted
+    fi
     # output headers on stderr, content on stdout
     head -n 1 $tempdir/formatted >&2
     tail -n +2 $tempdir/formatted
