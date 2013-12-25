@@ -136,12 +136,12 @@ check_on() {
 
 
 # apply default threshold variables if necessary
-if [ -z "$RESOURCE_THRESHOLD" ]; then
+if [ -z "$RES_THRESHOLD" ]; then
     cpu_default=10
     mem_default=5
 else
-    cpu_default=$RESOURCE_THRESHOLD
-    mem_default=$RESOURCE_THRESHOLD
+    cpu_default=$RES_THRESHOLD
+    mem_default=$RES_THRESHOLD
 fi
 
 # override those if other values were provided
