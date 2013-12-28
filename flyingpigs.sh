@@ -136,12 +136,9 @@ check_on() {
         fi
     done
 
-    # mark system as complete, and end waiting loop if this is the last one
+    # mark system as complete
     echo $1 >> $tempdir/done
-    if [ `cat $tempdir/done | wc -l` -eq $system_count ]; then
-        touch $tempdir/ready
-    fi
-    echo -n "." >&2
+    echo -n "o" >&2
 }
 
 
@@ -174,6 +171,7 @@ tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/systems
 touch $tempdir/processes
 touch $tempdir/load
+touch $tempdir/done
 echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	S	NI	COMMAND"\
     > $tempdir/header
 
@@ -215,8 +213,11 @@ for system in $systems; do
     fi
 done
 
-# stall until all the systems have reported back
-while [ ! -e $tempdir/ready ]; do sleep .1; done
+# kill time until all systems have reported back
+while [ `wc -l $tempdir/done | cut -d " " -f 1` -lt $system_count ]; do
+    echo -n "." >&2
+    sleep .5;
+done
 echo " done." >&2
 
 echo >&2

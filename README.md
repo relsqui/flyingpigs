@@ -30,11 +30,6 @@ environment variables and defaults:
   LOAD_THRESHOLD=3
 ```
 
-### authentication ###
-flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time. Failing that, flyingpigs will attempt to guess when you'll need to authenticate interactively and keep those processes in the foreground (instead of backgrounding them to save time). You can tell it to do this for all systems being checked with --serial.
-
-To specify a different user than your current one to connect as, prepend the username to the hostname using normal ssh syntax: `flyingpigs relsqui@carabiner.peeron.com`.
-
 ### what's a runaway? ###
 You can change the criteria for what processes are considered potential runaways by setting the environment variables, specifying them on the command line, or a combination of the two. The specific options take precedence over the environment variables, and both of those take precedence over the general resource threshold option. So one rather overcomplicated way to configure your criteria would be like this:
 ```
@@ -50,22 +45,51 @@ By default, flyingpigs connects to systems in the background and truncates the o
 
 flyingpigs ignores stdin. All its important content (load and process messages) goes to stdout, and everything else (labels and information) goes to stderr, so you can safely redirect it to a file for later parsing without a lot of extra clutter. Prompts for authentication will go to the terminal regardless of whether stdout and/or stderr are redirected.
 
+### authentication ###
+flyingpigs will check for an ssh-agent and create one if it doesn't exist, then check for keys and add them if not present. For best results, set up ssh keys and get all the systems you'll be checking on into your known_hosts ahead of time. Failing that, flyingpigs will attempt to guess when you'll need to authenticate interactively and keep those processes in the foreground (instead of backgrounding them to save time). You can tell it to do this for all systems being checked with --serial.
+
+To specify a different user than your current one to connect as, prepend the username to the hostname using normal ssh syntax: `flyingpigs relsqui@carabiner.peeron.com`.
+
 ### example ###
 ```
-[finnre@rita flyingpigs]$ flyingpigs `netgrouplist linux-login-sys ece-secure-sys cs-secure-sys | cut -d . -f 1`
-CPU_THRESHOLD=10
-MEM_THRESHOLD=5
-LOAD_THRESHOLD=3
-Checking 43 systems.
-Enter passphrase for /u/finnre/.ssh/id_rsa:
+[finnre@rita flyingpigs]$ ssh-agent bash
+
+[finnre@rita flyingpigs]$ ssh-add
+Enter passphrase for /u/finnre/.ssh/id_rsa: 
 Identity added: /u/finnre/.ssh/id_rsa (/u/finnre/.ssh/id_rsa)
-Collecting information ........................................... done.
+Enter passphrase for /u/finnre/.ssh/id_dsa: 
 
-No systems under heavy load.
-
-SYSTEM    PID    USER     TTY     STIME  %CPU  %MEM  NI  COMMAND
-sapphire  9165   root     ?       02:04  16.8  6.4   0   puppet agent: applying
-sapphire  9754   root     ?       02:05  0.0   6.3   0   puppet agent: applying
-emerald   32365  root     ?       02:05  18.0  0.1   0   sshd: finnre [priv]
-emerald   32371  finnre   ?       02:05  15.0  0.0   0   ps -e -o pid= -o user=
-eve       8946   yuswang  pts/13  Dec09  1.3   23.4  0   /pkgs/matlab/2012b/bin/```
+[finnre@rita flyingpigs]$ flyingpigs `netgrouplist linux-login-sys ece-secure-sys cs-secure-sys | cut -d . -f 1`
+CPU_THRESHOLD=10  
+MEM_THRESHOLD=5  
+LOAD_THRESHOLD=3  
+Checking 64 systems.  
+Collecting information ...........o....o.o.oooo..o.ooo.oooooooooo.oooooo.ooooooooooooooooooooooooooooo.ooooo...o..o.o done.  
+  
+rita is under high load: 14.36  16.75  15.84  
+  
+SYSTEM         PID    USER    TTY  STIME  %CPU  %MEM  S  NI  COMMAND  
+emerald        6823   root    ?    14:46  13.0  0.1   S  0   sshd: finnre [priv]
+emerald        6829   finnre  ?    14:46  16.0  0.0   R  0   ps -e -o pid= -o us
+eve            12108  avahi   ?    Dec19  30.2  0.0   S  0   avahi-daemon: runni
+fab04          57     root    ?    Dec19  0.0   0.0   D  0   [kworker/u:4]  
+little         32109  root    ?    14:46  12.5  0.6   S  0   puppet agent: apply
+rita           20241  jag     ?    Dec27  0.0   0.1   D  0   /usr/lib/gnome-sett
+rita           20278  jag     ?    Dec27  5.7   0.0   D  0   /usr/lib/dconf/dcon
+rita           20284  jag     ?    Dec27  0.0   0.1   D  0   nautilus -n  
+rita           20311  jag     ?    Dec27  0.0   0.0   D  0   /usr/lib/indicator-
+rita           20380  jag     ?    Dec27  0.0   0.0   D  0   /usr/lib/gnome-disk
+rita           20403  jag     ?    Dec27  0.0   0.0   D  0   telepathy-indicator
+rita           20404  jag     ?    Dec27  0.0   0.0   D  0   /usr/lib/gnome-user
+rita           20432  jag     ?    Dec27  0.0   0.0   D  0   gnome-screensaver  
+rita           20683  jag     ?    Dec27  0.0   0.0   D  0   update-notifier  
+rita           20945  jag     ?    Dec27  0.0   0.0   D  0   /usr/lib/deja-dup/d
+rita           21887  jag     ?    Dec27  0.0   0.0   D  0   nautilus computer:/
+rita           22042  jag     ?    Dec27  0.0   0.0   D  0   gnome-terminal  
+rita           5192   avahi   ?    Dec27  36.2  0.0   S  0   avahi-daemon: runni
+ruby           3063   root    ?    14:46  86.5  1.5   S  0   puppet agent: apply
+ruby           7498   avahi   ?    Dec20  34.8  0.0   S  0   avahi-daemon: runni
+sapphire       2872   avahi   ?    Dec19  33.8  0.0   S  0   avahi-daemon: runni
+walle          9643   avahi   ?    Dec19  30.5  0.0   S  0   avahi-daemon: runni
+white-flipper  14498  root    ?    14:46  11.1  0.6   S  0   puppet agent: apply
+```
