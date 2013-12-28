@@ -16,7 +16,8 @@ usage: $name [-h] [-w] [-s] [-c C] [-m M] [-r R] [-l L] SYS [SYS ...]
 
 Reports processes on each system which may be runaways, as well as any system
 which is under high load. You can specify the criteria for these using the
-command line arguments, environment variables, or both.
+command line arguments, environment variables, or both. Processes waiting
+on disk access will also be listed on systems reporting high load.
 
 positional arguments:
   SYS                 name or address of a system to check for runaways
@@ -90,32 +91,15 @@ int() {
 check_on() {
     # get the fields we want, and no headers, in a portable way
     nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu=\
-        -o pmem= -o nice= -o args=; uptime"\
+        -o pmem= -o s= -o nice= -o args=; uptime"\
         > $tempdir/systems/$1 2>/dev/null || return
 
     # copy the uptime line off the end and truncate to just the load numbers
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
         tr ',' ' '`
 
-    # read our file of collected processes, ignoring uptime line at the end
-    cat $tempdir/systems/$1 | head -n -1 | while read proc; do
-        if [ -n "$proc" ]; then
-            echo $proc | while read pid user tty stime cpu mem nice command; do
-                # truncate numbers so bash can compare them
-                intcpu=`int $cpu`
-                intmem=`int $mem`
-
-                # check memory and cpu usage and record the process if necessary
-                if [ $intcpu -ge $CPU_THRESHOLD -o\
-                     $intmem -ge $MEM_THRESHOLD ]; then
-                    # these are tab characters, so we can split on them later
-                    echo "$1	$pid	$user	$tty	$stime	$cpu	$mem	$nice	$command" >> $tempdir/processes
-                fi 2>/dev/null
-            done
-        fi
-    done
-
     # check 1- 5- and 15-minute load averages against threshold
+    loaded=false
     echo $load | while read load1 load5 load15; do
         load1=`int $load1`
         load5=`int $load5`
@@ -124,6 +108,31 @@ check_on() {
              $load5 -ge $LOAD_THRESHOLD -o \
              $load15 -ge $LOAD_THRESHOLD ]; then
             echo "$1 is under high load: $load" >> $tempdir/load
+            loaded=true
+        fi
+    done
+
+    # read our file of collected processes, ignoring uptime line at the end
+    cat $tempdir/systems/$1 | head -n -1 | while read proc; do
+        if [ -n "$proc" ]; then
+            echo $proc |\
+            while read pid user tty stime cpu mem state nice command; do
+                # truncate numbers so the shell can compare them
+                intcpu=`int $cpu`
+                intmem=`int $mem`
+
+                # trade second-level precision for some screen real estate
+                stime=`echo $stime | cut -c 1-5`
+
+                # check memory and cpu usage, as well as state if the system
+                # is loaded, and record the process if necessary
+                if [ "$intcpu" -ge "$CPU_THRESHOLD" -o\
+                     "$intmem" -ge "$MEM_THRESHOLD" -o\
+                     "$state" = "D" -a $loaded ]; then
+                    # these are tabs, not spaces, so we can split on them later
+                    echo "$1	$pid	$user	$tty	$stime	$cpu	$mem	$state	$nice	$command" >> $tempdir/processes
+                fi
+            done 2>/dev/null
         fi
     done
 
@@ -165,7 +174,7 @@ tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/systems
 touch $tempdir/processes
 touch $tempdir/load
-echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	NI	COMMAND"\
+echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	S	NI	COMMAND"\
     > $tempdir/header
 
 # collect and count the systems
@@ -227,11 +236,13 @@ candidates=`cat $tempdir/processes | wc -l`
 if [ $candidates -eq 0 ]; then
     echo "Found no potential runaways." >&2
 else
+    # make sure processes on the same system are adjacent
+    sort $tempdir/processes > $tempdir/sorted
     if $WRAP; then
-        cat $tempdir/header $tempdir/processes |\
-            column -nts "	" > $tempdir/formatted
+        cat $tempdir/header $tempdir/sorted |\
+            column -nts "	" | > $tempdir/formatted
     else
-        cat $tempdir/header $tempdir/processes |\
+        cat $tempdir/header $tempdir/sorted |\
             column -nts "	" | cut -c 1-`tput cols` > $tempdir/formatted
     fi
     # output headers on stderr, content on stdout

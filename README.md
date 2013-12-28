@@ -8,7 +8,8 @@ usage: flyingpigs [-h] [-w] [-s] [-c C] [-m M] [-r R] [-l L] SYS [SYS ...]
 
 Reports processes on each system which may be runaways, as well as any system
 which is under high load. You can specify the criteria for these using the
-command line arguments, environment variables, or both.
+command line arguments, environment variables, or both. Processes waiting
+on disk access will also be listed on systems reporting high load.
 
 positional arguments:
   SYS                 name or address of a system to check for runaways
@@ -34,16 +35,17 @@ flyingpigs will check for an ssh-agent and create one if it doesn't exist, then 
 
 To specify a different user than your current one to connect as, prepend the username to the hostname using normal ssh syntax: `flyingpigs relsqui@carabiner.peeron.com`.
 
-### options and i/o ###
+### what's a runaway? ###
 You can change the criteria for what processes are considered potential runaways by setting the environment variables, specifying them on the command line, or a combination of the two. The specific options take precedence over the environment variables, and both of those take precedence over the general resource threshold option. So one rather overcomplicated way to configure your criteria would be like this:
 ```
 export CPU_THRESHOLD=30
 flyingpigs -r 20 apple.example.com banana.example.com cherry.example.com
 ```
-With these settings, flyingpigs would report processes using at least 30% of a CPU (specified explicitly in a variable) or 20% of available memory (falling back on the general resource threshold option), or systems with a load average of at least 3 (the default). Note that --resource applies only to CPU and memory, not to load, since it's measured on a different scale.
+With these settings, flyingpigs would report processes using at least 30% of a CPU (specified explicitly in a variable) or 20% of available memory (falling back on the general resource threshold option), or systems with a load average of at least 3 (the default). (Note that --resource applies only to CPU and memory, not to load, since it's measured on a different scale.) It would also report any process which is waiting for disk access on a system which is over the load threshold, regardless of the resource usage of that process.
 
-flyingpigs will report the thresholds it's using when you run it.
+flyingpigs will list the thresholds it's using when you run it.
 
+### other options and i/o ###
 By default, flyingpigs connects to systems in the background and truncates the output to fit into columns on your screen. If you want to keep all the connections in the foreground (and consequently make only one at a time), use --serial. If you want to see more of the output, you can either make your terminal wider or use --wrap to turn off truncation altogether.
 
 flyingpigs ignores stdin. All its important content (load and process messages) goes to stdout, and everything else (labels and information) goes to stderr, so you can safely redirect it to a file for later parsing without a lot of extra clutter. Prompts for authentication will go to the terminal regardless of whether stdout and/or stderr are redirected.
