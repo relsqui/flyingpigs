@@ -175,6 +175,14 @@ touch $tempdir/done
 echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	S	NI	COMMAND"\
     > $tempdir/header
 
+# clean up subprocesses and tempdir if the script gets interrupted
+cleanup() {
+    pkill -P $$
+    rm -r $tempdir
+    exit
+}
+trap cleanup hup int term quit
+
 # collect and count the systems
 system_count=`echo "$systems" | wc -w`
 s=`plural $system_count`
