@@ -1,5 +1,10 @@
 #!/bin/sh
 
+
+# ================= #
+# === ARGUMENTS === #
+# ================= #
+
 # parse command-line switches and respond accordingly
 args=`getopt -o hwsc:m:r:l: \
      -l help,wrap,serial,cpu:,mem:,memory:,res:,resource:,load: -- $*`
@@ -71,14 +76,16 @@ EOF
 done
 
 
+# ================= #
+# === FUNCTIONS === #
+# ================= #
+
 # utility for making plural nouns display properly
 plural() {
     if [ "$1" -eq 1 ]; then
         echo -n ""
-        return 1
     else
         echo -n "s"
-        return 0
     fi
 }
 
@@ -87,12 +94,22 @@ int() {
     echo -n $1 | cut -d '.' -f 1
 }
 
+# how to clean up after ourselves
+cleanup() {
+    pkill -P $$
+    rm -r $tempdir
+    if [ $kill_ssh_agent ]; then
+        eval `ssh-agent -k` >/dev/null
+    fi
+    exit
+}
+
 # what to do for each system we're checking on
 check_on() {
     # get the fields we want, and no headers, in a portable way
     nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu=\
         -o pmem= -o s= -o nice= -o args=; uptime"\
-        > $tempdir/systems/$1 2>/dev/null || return
+        > $tempdir/systems/$1 2>/dev/null
 
     # copy the uptime line off the end and truncate to just the load numbers
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
@@ -142,6 +159,19 @@ check_on() {
 }
 
 
+# ============= #
+# === SETUP === #
+# ============= #
+
+# collect and count the systems
+system_count=`echo "$systems" | wc -w`
+s=`plural $system_count`
+echo "Checking $system_count system$s." >&2
+if [ $system_count -eq 0 ]; then
+    echo "Nothing to check. Exiting." >&2
+    exit
+fi
+
 # apply default threshold variables if necessary
 if [ -z "$RES_THRESHOLD" ]; then
     cpu_default=10
@@ -166,6 +196,9 @@ echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
 echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
 echo LOAD_THRESHOLD=$LOAD_THRESHOLD >&2
 
+# make sure we exit politely even if interrupted
+trap cleanup hup int term quit
+
 # set up some temporary workspace
 tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/systems
@@ -174,23 +207,6 @@ touch $tempdir/load
 touch $tempdir/done
 echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	S	NI	COMMAND"\
     > $tempdir/header
-
-# clean up subprocesses and tempdir if the script gets interrupted
-cleanup() {
-    pkill -P $$
-    rm -r $tempdir
-    exit
-}
-trap cleanup hup int term quit
-
-# collect and count the systems
-system_count=`echo "$systems" | wc -w`
-s=`plural $system_count`
-echo "Checking $system_count system$s." >&2
-if [ $system_count -eq 0 ]; then
-    echo "Nothing to check. Exiting." >&2
-    exit
-fi
 
 # initialize an ssh agent if necessary
 if [ -z "$SSH_AGENT_PID" ]; then
@@ -210,13 +226,18 @@ if ! ssh-add -l >/dev/null; then
     SERIAL=true
 fi
 
+
+# ================== #
+# === MAIN LOOPS === #
+# ================== #
+
 echo -n "Collecting information " >&2
 for system in $systems; do
     if ! $SERIAL && grep "^$system[, ]" ~/.ssh/known_hosts >/dev/null; then
+        # if we're not in serial mode and the system is in known_hosts,
         # connect in parallel to speed things up
         check_on $system &
     else
-        # except for unknown hosts or if serial mode is on
         check_on $system
     fi
 done
@@ -230,6 +251,11 @@ echo " done." >&2
 
 echo >&2
 
+
+# =============== #
+# === DISPLAY === #
+# =============== #
+
 # display load results, nicely formatted
 load=`cat $tempdir/load | wc -l`
 if [ $load -eq 0 ]; then
@@ -241,8 +267,7 @@ fi
 echo >&2
 
 # display runaway results, nicely formatted
-candidates=`cat $tempdir/processes | wc -l`
-if [ $candidates -eq 0 ]; then
+if [ `cat $tempdir/processes | wc -l` -eq 0 ]; then
     echo "Found no potential runaways." >&2
 else
     # make sure processes on the same system are adjacent
@@ -259,12 +284,9 @@ else
     tail -n +2 $tempdir/formatted
 fi
 
-# clean up
-rm -r $tempdir
-if [ $kill_ssh_agent ]; then
-    eval `ssh-agent -k` >/dev/null
-fi
+cleanup
 
 
 # modeline to tell vim not to expand the tabs in this file
+# (it's indented with spaces, but we use tabs to split on in some strings)
 # vim: set noexpandtab
