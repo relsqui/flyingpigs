@@ -145,7 +145,7 @@ check_on() {
                 # is loaded, and record the process if necessary
                 if [ "$intcpu" -ge "$CPU_THRESHOLD" -o\
                      "$intmem" -ge "$MEM_THRESHOLD" -o\
-                     "$state" = "D" -a $loaded ]; then
+                     \("$state" = "D" -a $loaded\) ]; then
                     # these are tabs, not spaces, so we can split on them later
                     echo "$1	$pid	$user	$tty	$stime	$cpu	$mem	$state	$nice	$command" >> $tempdir/processes
                 fi
