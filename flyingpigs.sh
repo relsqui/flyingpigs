@@ -121,9 +121,9 @@ check_on() {
         load1=`int $load1`
         load5=`int $load5`
         load15=`int $load15`
-        if [ $load1 -ge $LOAD_THRESHOLD -o \
-             $load5 -ge $LOAD_THRESHOLD -o \
-             $load15 -ge $LOAD_THRESHOLD ]; then
+        if [ "$load1" -ge $LOAD_THRESHOLD -o \
+             "$load5" -ge $LOAD_THRESHOLD -o \
+             "$load15" -ge $LOAD_THRESHOLD ]; then
             echo "$1 is under high load: $load" >> $tempdir/load
             loaded=true
         fi
