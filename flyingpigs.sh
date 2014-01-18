@@ -130,6 +130,9 @@ check_on() {
              "$load15" -ge $LOAD_THRESHOLD ]; then
             echo "$1 is under high load: $load" >> $tempdir/load
             loaded=true
+        fi 2>/dev/null
+        if [ "$?" -ne 0 ]; then
+            echo "Couldn't get load data for $1." >> $tempdir/load
         fi
     done
 
