@@ -4,7 +4,7 @@ tracks down and reports runaway processes which could potentially have a negativ
 
 ### quick reference ###
 ```
-usage: flyingpigs [-h] [-w] [-s] [-c C] [-m M] [-r R] [-l L] SYS [SYS ...]
+usage: flyingpigs [-h] [-w] [-s] [-t T] [-c C] [-m M] [-r R] [-l L] SYS [SYS...]
 
 Reports processes on each system which may be runaways, as well as any system
 which is under high load. You can specify the criteria for these using the
@@ -18,12 +18,14 @@ optional arguments:
   -h, --help          show this help message and exit
   -w, --wrap          wrap output instead of truncating to fit screen
   -s, --serial        connect to hosts one by one instead of in the background
+  -t, --timeout T     wait T seconds before giving up on an ssh connection
   -c, --cpu C         set the minimum reported CPU usage to C%
   -m, --mem[ory] M    set the minimum reported memory usage to M%
   -r, --res[ource] R  set default for both CPU and memory thresholds
   -l, --load L        set the minimum reported load average to L
 
 environment variables and defaults:
+  TIMEOUT=7
   CPU_THRESHOLD=10
   MEM_THRESHOLD=5
   RES_THRESHOLD=
@@ -43,6 +45,8 @@ flyingpigs will list the thresholds it's using when you run it.
 ### other options and i/o ###
 By default, flyingpigs connects to systems in the background and truncates the output to fit into columns on your screen. If you want to keep all the connections in the foreground (and consequently make only one at a time), use --serial. If you want to see more of the output, you can either make your terminal wider or use --wrap to turn off truncation altogether.
 
+If an ssh connection to one of the systems cannot be made, flyingpigs will report it as a failure. If the ssh connection is accepted but cannot be completed, flyingpigs will wait a specified number of seconds before giving up. You can change the timeout with --timeout.
+
 flyingpigs ignores stdin. All its important content (load and process messages) goes to stdout, and everything else (labels and information) goes to stderr, so you can safely redirect it to a file for later parsing without a lot of extra clutter. Prompts for authentication will go to the terminal regardless of whether stdout and/or stderr are redirected.
 
 ### authentication ###
@@ -60,6 +64,7 @@ Identity added: /u/finnre/.ssh/id_rsa (/u/finnre/.ssh/id_rsa)
 Enter passphrase for /u/finnre/.ssh/id_dsa: 
 
 [finnre@rita flyingpigs]$ flyingpigs `netgrouplist linux-login-sys ece-secure-sys cs-secure-sys | cut -d . -f 1`
+TIMEOUT=7
 CPU_THRESHOLD=10  
 MEM_THRESHOLD=5  
 LOAD_THRESHOLD=3  

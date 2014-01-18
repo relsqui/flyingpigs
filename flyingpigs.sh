@@ -6,8 +6,8 @@
 # ================= #
 
 # parse command-line switches and respond accordingly
-args=`getopt -o hwsc:m:r:l: \
-     -l help,wrap,serial,cpu:,mem:,memory:,res:,resource:,load: -- $*`
+args=`getopt -o hwst:c:m:r:l: \
+     -l help,wrap,serial,timeout:,cpu:,mem:,memory:,res:,resource:,load: -- $*`
 set -- $args
 
 WRAP=false
@@ -17,7 +17,7 @@ for arg; do
         -h|--help)
             name=`basename $0`
             cat <<EOF
-usage: $name [-h] [-w] [-s] [-c C] [-m M] [-r R] [-l L] SYS [SYS ...]
+usage: $name [-h] [-w] [-s] [-t T] [-c C] [-m M] [-r R] [-l L] SYS [SYS...]
 
 Reports processes on each system which may be runaways, as well as any system
 which is under high load. You can specify the criteria for these using the
@@ -31,12 +31,14 @@ optional arguments:
   -h, --help          show this help message and exit
   -w, --wrap          wrap output instead of truncating to fit screen
   -s, --serial        connect to hosts one by one instead of in the background
+  -t, --timeout T     wait T seconds before giving up on an ssh connection
   -c, --cpu C         set the minimum reported CPU usage to C%
   -m, --mem[ory] M    set the minimum reported memory usage to M%
   -r, --res[ource] R  set default for both CPU and memory thresholds
   -l, --load L        set the minimum reported load average to L
 
 environment variables and defaults:
+  TIMEOUT=7
   CPU_THRESHOLD=10
   MEM_THRESHOLD=5
   RES_THRESHOLD=
@@ -50,6 +52,11 @@ EOF
         ;;
         -s|--serial)
             SERIAL=true
+            shift
+        ;;
+        -t|--timeout)
+            TIMEOUT=`echo "$2" | sed "s/'//g"`
+            shift
             shift
         ;;
         -c|--cpu)
@@ -111,9 +118,14 @@ cleanup() {
 # what to do for each system we're checking on
 check_on() {
     # get the fields we want, and no headers, in a portable way
-    nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu=\
-        -o pmem= -o s= -o nice= -o args=; uptime"\
-        > $tempdir/systems/$1 2>/dev/null
+    timeout $TIMEOUT nice ssh $1 "ps -e -o pid= -o user= -o tty= -o stime= \
+                                 -o pcpu=\ -o pmem= -o s= -o nice= -o args=; \
+                                 uptime"\ > $tempdir/systems/$1 2>/dev/null
+    if [ "$?" -ne 0 ]; then
+        echo "Couldn't reach $1!" >> $tempdir/errors
+        echo $1 >> $tempdir/finished
+        echo -n "x" >&2
+    fi
 
     # copy the uptime line off the end and truncate to just the load numbers
     load=`tail -n 1 $tempdir/systems/$1 | sed 's/.*load average: *//' |\
@@ -161,7 +173,7 @@ check_on() {
     done
 
     # mark system as complete
-    echo $1 >> $tempdir/done
+    echo $1 >> $tempdir/finished
     echo -n "o" >&2
 }
 
@@ -179,7 +191,12 @@ if [ $system_count -eq 0 ]; then
     exit
 fi
 
-# apply default threshold variables if necessary
+# set timeout if not provided
+if [ -z "$TIMEOUT" ]; then
+    TIMEOUT=7
+fi
+
+# set default threshold variables
 if [ -z "$RES_THRESHOLD" ]; then
     cpu_default=10
     mem_default=5
@@ -188,7 +205,7 @@ else
     mem_default=$RES_THRESHOLD
 fi
 
-# override those if other values were provided
+# apply them only if no values were provided
 if [ -z "$CPU_THRESHOLD" ]; then
     CPU_THRESHOLD=$cpu_default
 fi
@@ -199,6 +216,7 @@ if [ -z "$LOAD_THRESHOLD" ]; then
     LOAD_THRESHOLD=3
 fi
 
+echo TIMEOUT=$TIMEOUT >&2
 echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
 echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
 echo LOAD_THRESHOLD=$LOAD_THRESHOLD >&2
@@ -211,7 +229,8 @@ tempdir=`mktemp -dt "flyingpigs-XXXXXX"`
 mkdir $tempdir/systems
 touch $tempdir/processes
 touch $tempdir/load
-touch $tempdir/done
+touch $tempdir/finished
+touch $tempdir/errors
 echo "SYSTEM	PID	USER	TTY	STIME	%CPU	%MEM	S	NI	COMMAND"\
     > $tempdir/header
 
@@ -250,7 +269,7 @@ for system in $systems; do
 done
 
 # kill time until all systems have reported back
-while [ `wc -l $tempdir/done | cut -d " " -f 1` -lt $system_count ]; do
+while [ `wc -l $tempdir/finished | cut -d " " -f 1` -lt $system_count ]; do
     echo -n "." >&2
     sleep .5
 done
@@ -289,6 +308,11 @@ else
     # output headers on stderr, content on stdout
     head -n 1 $tempdir/formatted >&2
     tail -n +2 $tempdir/formatted
+fi
+
+if [ `cat $tempdir/errors | wc -l` -ne 0 ]; then
+    echo >&2
+    cat $tempdir/errors >&2
 fi
 
 cleanup
