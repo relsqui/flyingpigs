@@ -144,7 +144,7 @@ check_on() {
             loaded=true
         fi 2>/dev/null
         if [ "$?" -ne 0 ]; then
-            echo "Couldn't get load data for $1." >> $tempdir/load
+            echo "Couldn't get load data for $1." >> $tempdir/errors
         fi
     done
 
