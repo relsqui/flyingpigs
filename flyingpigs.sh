@@ -46,27 +46,31 @@ EOF
         ;;
         -w|--wrap)
             WRAP=true
-            shift;
+            shift
         ;;
         -s|--serial)
             SERIAL=true
-            shift;
+            shift
         ;;
         -c|--cpu)
             CPU_THRESHOLD=`echo "$2" | sed "s/'//g"`
-            shift; shift
+            shift
+            shift
         ;;
         -m|--mem|--memory)
             MEM_THRESHOLD=`echo "$2" | sed "s/'//g"`
-            shift; shift
+            shift
+            shift
         ;;
         -r|--res|--resource)
             RES_THRESHOLD=`echo "$2" | sed "s/'//g"`
-            shift; shift
+            shift
+            shift
         ;;
         -l|--load)
             LOAD_THRESHOLD=`echo "$2" | sed "s/'//g"`
-            shift; shift
+            shift
+            shift
         ;;
         --)
             shift
@@ -245,7 +249,7 @@ done
 # kill time until all systems have reported back
 while [ `wc -l $tempdir/done | cut -d " " -f 1` -lt $system_count ]; do
     echo -n "." >&2
-    sleep .5;
+    sleep .5
 done
 echo " done." >&2
 
