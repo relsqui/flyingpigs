@@ -302,7 +302,7 @@ else
     sort $tempdir/processes > $tempdir/sorted
     if $WRAP; then
         cat $tempdir/header $tempdir/sorted |\
-            column -nts "	" | > $tempdir/formatted
+            column -nts "	" > $tempdir/formatted
     else
         cat $tempdir/header $tempdir/sorted |\
             column -nts "	" | cut -c 1-`tput cols` > $tempdir/formatted
