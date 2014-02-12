@@ -110,7 +110,7 @@ cleanup() {
     pkill -P $$
     rm -r $tempdir
     if $kill_ssh_agent; then
-        eval `ssh-agent -k` #>/dev/null
+        eval `ssh-agent -k` >/dev/null
     fi
     exit
 }
