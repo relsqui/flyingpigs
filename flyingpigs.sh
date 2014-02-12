@@ -220,6 +220,7 @@ echo TIMEOUT=$TIMEOUT >&2
 echo CPU_THRESHOLD=$CPU_THRESHOLD >&2
 echo MEM_THRESHOLD=$MEM_THRESHOLD >&2
 echo LOAD_THRESHOLD=$LOAD_THRESHOLD >&2
+echo SERIAL=$SERIAL >&2
 
 # make sure we exit politely even if interrupted
 trap cleanup hup int term quit
@@ -259,7 +260,8 @@ fi
 
 echo -n "Collecting information " >&2
 for system in $systems; do
-    if ! $SERIAL && grep "^$system[, ]" ~/.ssh/known_hosts >/dev/null; then
+    if grep "^$system[., ]" ~/.ssh/known_hosts /etc/ssh/*known_hosts* \
+        >/dev/null && ! $SERIAL; then
         # if we're not in serial mode and the system is in known_hosts,
         # connect in parallel to speed things up
         check_on $system &
