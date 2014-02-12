@@ -119,8 +119,8 @@ cleanup() {
 check_on() {
     # get the fields we want, and no headers, in a portable way
     timeout --foreground $TIMEOUT nice ssh $1 \
-        "ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= \
-        -o s= -o nice= -o args=; uptime" > $tempdir/systems/$1 2>/dev/null
+        "nice ps -e -o pid= -o user= -o tty= -o stime= -o pcpu= -o pmem= \
+        -o s= -o nice= -o args=; nice uptime" > $tempdir/systems/$1 2>/dev/null
     if [ "$?" -ne 0 ]; then
         echo "Couldn't reach $1!" >> $tempdir/errors
         echo $1 >> $tempdir/finished
