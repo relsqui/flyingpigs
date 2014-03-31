@@ -301,10 +301,11 @@ else
     # make sure processes on the same system are adjacent
     sort $tempdir/processes > $tempdir/sorted
     if $WRAP; then
-        cat $tempdir/header $tempdir/sorted |\
+        # the cut is because column can't handle long lines
+        cat $tempdir/header $tempdir/sorted | cut -c -2047 |\
             column -nts "	" > $tempdir/formatted
     else
-        cat $tempdir/header $tempdir/sorted |\
+        cat $tempdir/header $tempdir/sorted | cut -c -2047 |\
             column -nts "	" | cut -c 1-`tput cols` > $tempdir/formatted
     fi
     # output headers on stderr, content on stdout
